@@ -6,6 +6,18 @@ import commentRouter from "./routes/comment.route.js";
 import webhookRouter from "./routes/webhook.route.js";
 import { clerkMiddleware, requireAuth } from "@clerk/express";
 import cors from "cors";
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import * as dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: `${__dirname}/.env` });
+
+console.log('ImageKit Public Key:', process.env.IMAGEKIT_PUBLIC_KEY);
+console.log('ImageKit Private Key:', process.env.IMAGEKIT_PRIVATE_KEY);
+console.log('ImageKit URL Endpoint:', process.env.IMAGEKIT_URL_ENDPOINT);
 
 const app = express();
 
