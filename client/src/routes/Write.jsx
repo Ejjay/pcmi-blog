@@ -2,11 +2,13 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import "react-quill-new/dist/quill.snow.css";
 import ReactQuill from "react-quill-new";
 import { useMutation } from "@tanstack/react-query";
-import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Upload from "../components/Upload";
+
+// Define the API URL using environment variables
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const Write = () => {
   const { isLoaded, isSignedIn } = useUser();
@@ -28,21 +30,36 @@ const Write = () => {
   }, [video]);
 
   const navigate = useNavigate();
-
   const { getToken } = useAuth();
 
   const mutation = useMutation({
     mutationFn: async (newPost) => {
       const token = await getToken();
-      return axios.post(`${import.meta.env.VITE_API_URL}/posts`, newPost, {
+      console.log("Token:", token); // Log the token for debugging
+      const res = await fetch(`${API_URL}/posts`, {
+        method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify(newPost),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Server response:", errorData);
+        throw new Error(errorData.message || "Failed to create post");
+      }
+
+      return res.json();
     },
     onSuccess: (res) => {
       toast.success("Post has been created");
-      navigate(`/${res.data.slug}`);
+      navigate(`/${res.slug}`);
+    },
+    onError: (error) => {
+      console.error("Error creating post:", error);
+      toast.error(error.message || "Failed to create post. Please try again.");
     },
   });
 
@@ -66,8 +83,7 @@ const Write = () => {
       content: value,
     };
 
-    console.log(data);
-
+    console.log("Submitting data:", data);
     mutation.mutate(data);
   };
 
@@ -131,8 +147,7 @@ const Write = () => {
         >
           {mutation.isPending ? "Loading..." : "Send"}
         </button>
-        {"Progress:" + progress}
-        {/* {mutation.isError && <span>{mutation.error.message}</span>} */}
+        <div>{"Progress:" + progress}</div>
       </form>
     </div>
   );

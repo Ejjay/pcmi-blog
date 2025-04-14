@@ -1,3 +1,6 @@
 .env
 node_modules
 .DS_Store
+ai-codebase3
+/ai-codebase3
+.greptileIndex
