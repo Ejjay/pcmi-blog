@@ -21,17 +21,35 @@ console.log('ImageKit URL Endpoint:', process.env.IMAGEKIT_URL_ENDPOINT);
 
 const app = express();
 
-app.use(cors(process.env.CLIENT_URL));
+// Add CORS configuration
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  credentials: true
+}));
+
+// Add debug logging middleware
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
+// Add test endpoint
+app.get("/test", (req, res) => {
+  res.json({ message: "Server is working!" });
+});
+
 app.use(clerkMiddleware());
 app.use("/webhooks", webhookRouter);
 app.use(express.json());
 
+// Add CORS headers
 app.use(function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Origin", process.env.CLIENT_URL || "http://localhost:5173");
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
   );
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   next();
 });
 
@@ -45,6 +63,7 @@ app.use("/users", userRouter);
 app.use("/posts", postRouter);
 app.use("/comments", commentRouter);
 
+// Error handling middleware
 app.use((error, req, res, next) => {
   res.status(error.status || 500);
   res.json({
@@ -54,7 +73,8 @@ app.use((error, req, res, next) => {
   });
 });
 
+// Start server
 app.listen(3000, () => {
   connectDB();
-  console.log("Server is running!");
+  console.log("Server is running on port 3000!");
 });

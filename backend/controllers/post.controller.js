@@ -8,7 +8,6 @@ export const getPosts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-
     const query = {};
 
     console.log(req.query);
@@ -77,119 +76,145 @@ export const getPosts = async (req, res) => {
     res.status(200).json({ posts, hasMore });
   } catch (error) {
     console.error("Error fetching posts:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error while fetching posts" });
   }
 };
 
 export const getPost = async (req, res) => {
-  const post = await Post.findOne({ slug: req.params.slug }).populate(
-    "user",
-    "username img"
-  );
-  res.status(200).json(post);
+  try {
+    const post = await Post.findOne({ slug: req.params.slug }).populate(
+      "user",
+      "username img"
+    );
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    res.status(200).json(post);
+  } catch (error) {
+    console.error("Error fetching post:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error while fetching the post" });
+  }
 };
 
 export const createPost = async (req, res) => {
-  const clerkUserId = req.auth.userId;
+  try {
+    // Check if user is authenticated
+    if (!req.auth.userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-  console.log(req.headers);
+    // Find the user in the database
+    const user = await User.findOne({ clerkUserId: req.auth.userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found!" });
+    }
 
-  if (!clerkUserId) {
-    return res.status(401).json("Not authenticated!");
+    let slug = req.body.title.replace(/ /g, "-").toLowerCase();
+
+    let existingPost = await Post.findOne({ slug });
+
+    let counter = 2;
+    while (existingPost) {
+      slug = `${slug}-${counter}`;
+      existingPost = await Post.findOne({ slug });
+      counter++;
+    }
+
+    const newPost = new Post({ user: user._id, slug, ...req.body });
+    const post = await newPost.save();
+
+    res.status(200).json(post);
+  } catch (error) {
+    console.error("Error creating post:", error);
+    res.status(500).json({ message: "Error creating post" });
   }
-
-  const user = await User.findOne({ clerkUserId });
-
-  if (!user) {
-    return res.status(404).json("User not found!");
-  }
-
-  let slug = req.body.title.replace(/ /g, "-").toLowerCase();
-
-  let existingPost = await Post.findOne({ slug });
-
-  let counter = 2;
-
-  while (existingPost) {
-    slug = `${slug}-${counter}`;
-    existingPost = await Post.findOne({ slug });
-    counter++;
-  }
-
-  const newPost = new Post({ user: user._id, slug, ...req.body });
-
-  const post = await newPost.save();
-  res.status(200).json(post);
 };
 
 export const deletePost = async (req, res) => {
-  const clerkUserId = req.auth.userId;
+  try {
+    const clerkUserId = req.auth.userId;
+    if (!clerkUserId) {
+      return res.status(401).json({ message: "Not authenticated!" });
+    }
 
-  if (!clerkUserId) {
-    return res.status(401).json("Not authenticated!");
+    const role = req.auth.sessionClaims?.metadata?.role || "user";
+
+    if (role === "admin") {
+      await Post.findByIdAndDelete(req.params.id);
+      return res.status(200).json({ message: "Post has been deleted" });
+    }
+
+    const user = await User.findOne({ clerkUserId });
+    const deletedPost = await Post.findOneAndDelete({
+      _id: req.params.id,
+      user: user._id,
+    });
+
+    if (!deletedPost) {
+      return res
+        .status(403)
+        .json({ message: "You can delete only your posts!" });
+    }
+
+    res.status(200).json({ message: "Post has been deleted" });
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    res.status(500).json({ message: "Error deleting post" });
   }
-
-  const role = req.auth.sessionClaims?.metadata?.role || "user";
-
-  if (role === "admin") {
-    await Post.findByIdAndDelete(req.params.id);
-    return res.status(200).json("Post has been deleted");
-  }
-
-  const user = await User.findOne({ clerkUserId });
-
-  const deletedPost = await Post.findOneAndDelete({
-    _id: req.params.id,
-    user: user._id,
-  });
-
-  if (!deletedPost) {
-    return res.status(403).json("You can delete only your posts!");
-  }
-
-  res.status(200).json("Post has been deleted");
 };
 
 export const featurePost = async (req, res) => {
-  const clerkUserId = req.auth.userId;
-  const postId = req.body.postId;
+  try {
+    const clerkUserId = req.auth.userId;
+    const postId = req.body.postId;
 
-  if (!clerkUserId) {
-    return res.status(401).json("Not authenticated!");
+    if (!clerkUserId) {
+      return res.status(401).json({ message: "Not authenticated!" });
+    }
+
+    const role = req.auth.sessionClaims?.metadata?.role || "user";
+    if (role !== "admin") {
+      return res
+        .status(403)
+        .json({ message: "You cannot feature posts!" });
+    }
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found!" });
+    }
+
+    const isFeatured = post.isFeatured;
+
+    const updatedPost = await Post.findByIdAndUpdate(
+      postId,
+      { isFeatured: !isFeatured },
+      { new: true }
+    );
+
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error("Error featuring post:", error);
+    res.status(500).json({ message: "Error featuring post" });
   }
-
-  const role = req.auth.sessionClaims?.metadata?.role || "user";
-
-  if (role !== "admin") {
-    return res.status(403).json("You cannot feature posts!");
-  }
-
-  const post = await Post.findById(postId);
-
-  if (!post) {
-    return res.status(404).json("Post not found!");
-  }
-
-  const isFeatured = post.isFeatured;
-
-  const updatedPost = await Post.findByIdAndUpdate(
-    postId,
-    {
-      isFeatured: !isFeatured,
-    },
-    { new: true }
-  );
-
-  res.status(200).json(updatedPost);
 };
 
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
 });
 
 export const uploadAuth = async (req, res) => {
-  const result = imagekit.getAuthenticationParameters();
-  res.send(result);
+  try {
+    const result = imagekit.getAuthenticationParameters();
+    res.send(result);
+  } catch (error) {
+    console.error("Error getting upload auth:", error);
+    res.status(500).json({ message: "Error getting upload auth" });
+  }
 };

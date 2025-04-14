@@ -33,26 +33,31 @@ const Write = () => {
   const { getToken } = useAuth();
 
   const mutation = useMutation({
-    mutationFn: async (newPost) => {
-      const token = await getToken();
-      console.log("Token:", token); // Log the token for debugging
-      const res = await fetch(`${API_URL}/posts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(newPost),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        console.error("Server response:", errorData);
-        throw new Error(errorData.message || "Failed to create post");
-      }
-
-      return res.json();
-    },
+  mutationFn: async (data) => {
+    console.log("Submitting data:", data);
+    
+    // Get the authentication token
+    const token = await getToken();
+    console.log("Token:", token);
+    
+    const res = await fetch("http://localhost:3000/posts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    
+    if (!res.ok) {
+      // Try to get more error details
+      const errorText = await res.text();
+      console.error("Error response:", res.status, errorText);
+      throw new Error(`Failed to create post: ${res.status} ${errorText}`);
+    }
+    
+    return res.json();
+  },
     onSuccess: (res) => {
       toast.success("Post has been created");
       navigate(`/${res.slug}`);
