@@ -13,7 +13,7 @@ const RegisterPage = () => {
         try {
           const token = await getToken();
           // Create user in your database
-          const response = await fetch("http://localhost:3000/users", {
+          const response = await fetch("https://pcmi-blog-backend.vercel.app/users", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
